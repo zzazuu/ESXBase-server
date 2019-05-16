@@ -21,7 +21,7 @@ That is why im making this Pre-setup server made by only using official ESX reso
 
 # Requirements
 You will need to install these things to be able to follow the guide, if you are a person who knows what you are doing then do it your own way.
-
+- Make sure you have installed Visual C++ redistributable 2017 or newer. https://go.microsoft.com/fwlink/?LinkId=746572
 - HeidiSql download from: https://www.heidisql.com/
 - XAMPP download from: https://www.apachefriends.org/index.html
 
