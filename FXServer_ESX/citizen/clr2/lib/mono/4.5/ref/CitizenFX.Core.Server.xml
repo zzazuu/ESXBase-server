@@ -6493,6 +6493,11 @@
             ^Rockstar Devs named it like that, Now cry about it.
             </summary>
         </member>
+        <member name="F:CitizenFX.Core.Native.Hash.GET_CONSOLE_BUFFER">
+            <summary>
+            Returns the current console output buffer.
+            </summary>
+        </member>
         <member name="F:CitizenFX.Core.Native.Hash.GET_CURRENT_RESOURCE_NAME">
             <summary>
             Returns the name of the currently executing resource.
@@ -6585,6 +6590,11 @@
             **Example result**:
             
             ![](https://i.imgur.com/TaCnG09.png)
+            </summary>
+        </member>
+        <member name="F:CitizenFX.Core.Native.Hash.REGISTER_CONSOLE_LISTENER">
+            <summary>
+            Registers a listener for console output messages.
             </summary>
         </member>
         <member name="F:CitizenFX.Core.Native.Hash.REGISTER_RESOURCE_ASSET">
@@ -6723,6 +6733,12 @@
             ^Rockstar Devs named it like that, Now cry about it.
             </summary>
         </member>
+        <member name="M:CitizenFX.Core.Native.API.GetConsoleBuffer">
+            <summary>
+            Returns the current console output buffer.
+            </summary>
+            <returns>The most recent game console output, as a string.</returns>
+        </member>
         <member name="M:CitizenFX.Core.Native.API.GetCurrentResourceName">
             <summary>
             Returns the name of the currently executing resource.
@@ -6835,6 +6851,12 @@
             <param name="commandName">The command you want to register.</param>
             <param name="handler">A handler function that gets called whenever the command is executed.</param>
             <param name="restricted">If this is a server command and you set this to true, then players will need the command.yourCommandName ace permission to execute this command.</param>
+        </member>
+        <member name="M:CitizenFX.Core.Native.API.RegisterConsoleListener(CitizenFX.Core.Native.InputArgument)">
+            <summary>
+            Registers a listener for console output messages.
+            </summary>
+            <param name="listener">A function of `(channel: string, message: string) =&gt; void`. The message might contain `\n`.</param>
         </member>
         <member name="M:CitizenFX.Core.Native.API.RegisterResourceAsEventHandler(System.String)">
             <summary>
@@ -7753,6 +7775,189 @@
              <remarks>
             	Formats the SizeF as a string in coordinate notation.
              </remarks>
+        </member>
+        <member name="M:System.Diagnostics.EnhancedStackFrame.GetFileColumnNumber">
+            <summary>
+                 Gets the column number in the file that contains the code that is executing. 
+                 This information is typically extracted from the debugging symbols for the executable.
+            </summary>
+            <returns>The file column number, or 0 (zero) if the file column number cannot be determined.</returns>
+        </member>
+        <member name="M:System.Diagnostics.EnhancedStackFrame.GetFileLineNumber">
+            <summary>
+                Gets the line number in the file that contains the code that is executing. 
+                This information is typically extracted from the debugging symbols for the executable.
+            </summary>
+            <returns>The file line number, or 0 (zero) if the file line number cannot be determined.</returns>
+        </member>
+        <member name="M:System.Diagnostics.EnhancedStackFrame.GetFileName">
+            <summary>
+                Gets the file name that contains the code that is executing. 
+                This information is typically extracted from the debugging symbols for the executable.
+            </summary>
+            <returns>The file name, or null if the file name cannot be determined.</returns>
+        </member>
+        <member name="M:System.Diagnostics.EnhancedStackFrame.GetILOffset">
+            <summary>
+               Gets the offset from the start of the Microsoft intermediate language (MSIL)
+               code for the method that is executing. This offset might be an approximation
+               depending on whether or not the just-in-time (JIT) compiler is generating debugging
+               code. The generation of this debugging information is controlled by the System.Diagnostics.DebuggableAttribute.
+            </summary>
+            <returns>The offset from the start of the MSIL code for the method that is executing.</returns>
+        </member>
+        <member name="M:System.Diagnostics.EnhancedStackFrame.GetMethod">
+            <summary>
+                Gets the method in which the frame is executing.
+            </summary>
+            <returns>The method in which the frame is executing.</returns>
+        </member>
+        <member name="M:System.Diagnostics.EnhancedStackFrame.GetNativeOffset">
+            <summary>
+                Gets the offset from the start of the native just-in-time (JIT)-compiled code
+                for the method that is being executed. The generation of this debugging information
+                is controlled by the System.Diagnostics.DebuggableAttribute class.
+            </summary>
+            <returns>The offset from the start of the JIT-compiled code for the method that is being executed.</returns>
+        </member>
+        <member name="M:System.Diagnostics.EnhancedStackFrame.ToString">
+            <summary>
+                Builds a readable representation of the stack trace.
+            </summary>
+            <returns>A readable representation of the stack trace.</returns>
+        </member>
+        <member name="P:System.Diagnostics.EnhancedStackTrace.FrameCount">
+            <summary>
+            Gets the number of frames in the stack trace.
+            </summary>
+            <returns>The number of frames in the stack trace.</returns>
+        </member>
+        <member name="M:System.Diagnostics.EnhancedStackTrace.GetFrame(System.Int32)">
+            <summary>
+            Gets the specified stack frame.
+            </summary>
+            <param name="index">The index of the stack frame requested.</param>
+            <returns>The specified stack frame.</returns>
+        </member>
+        <member name="M:System.Diagnostics.EnhancedStackTrace.GetFrames">
+            <summary>
+                Returns a copy of all stack frames in the current stack trace.
+            </summary>
+            <returns>
+                An array of type System.Diagnostics.StackFrame representing the function calls
+                in the stack trace.
+            </returns>
+        </member>
+        <member name="M:System.Diagnostics.EnhancedStackTrace.ToString">
+            <summary>
+            Builds a readable representation of the stack trace.
+            </summary>
+            <returns>A readable representation of the stack trace.</returns>
+        </member>
+        <member name="M:System.Diagnostics.EnhancedStackTrace.TryGetFullPath(System.String)">
+            <summary>
+            Tries to convert a given <paramref name="filePath"/> to a full path.
+            Returns original value if the conversion isn't possible or a given path is relative.
+            </summary>
+        </member>
+        <member name="T:System.Diagnostics.ExceptionExtentions">
+            <nodoc />
+        </member>
+        <member name="M:System.Diagnostics.ExceptionExtentions.Demystify``1(``0)">
+            <summary>
+            Demystifies the given <paramref name="exception"/> and tracks the original stack traces for the whole exception tree.
+            </summary>
+        </member>
+        <member name="M:System.Diagnostics.ExceptionExtentions.ToStringDemystified(System.Exception)">
+            <summary>
+            Gets demystified string representation of the <paramref name="exception"/>.
+            </summary>
+            <remarks>
+            <see cref="M:System.Diagnostics.ExceptionExtentions.Demystify``1(``0)"/> method mutates the exception instance that can cause
+            issues if a system relies on the stack trace be in the specific form.
+            Unlike <see cref="M:System.Diagnostics.ExceptionExtentions.Demystify``1(``0)"/> this method is pure. It calls <see cref="M:System.Diagnostics.ExceptionExtentions.Demystify``1(``0)"/> first,
+            computes a demystified string representation and then restores the original state of the exception back.
+            </remarks>
+        </member>
+        <member name="T:System.Diagnostics.Internal.ReflectionHelper">
+            <summary>
+            A helper class that contains utilities methods for dealing with reflection.
+            </summary>
+        </member>
+        <member name="M:System.Diagnostics.Internal.ReflectionHelper.IsReadOnlyAttribute(System.Type)">
+            <summary>
+            Returns true if <paramref name="type"/> is <code>System.Runtime.CompilerServices.IsReadOnlyAttribute</code>.
+            </summary>
+        </member>
+        <member name="M:System.Diagnostics.Internal.ReflectionHelper.IsValueTuple(System.Type)">
+            <summary>
+            Returns true if the <paramref name="type"/> is a value tuple type.
+            </summary>
+        </member>
+        <member name="M:System.Diagnostics.Internal.ReflectionHelper.IsTupleElementNameAttribue(System.Attribute)">
+            <summary>
+            Returns true if the given <paramref name="attribute"/> is of type <code>TupleElementNameAttribute</code>.
+            </summary>
+            <remarks>
+            To avoid compile-time depencency hell with System.ValueTuple, this method uses reflection and not checks statically that 
+            the given <paramref name="attribute"/> is <code>TupleElementNameAttribute</code>.
+            </remarks>
+        </member>
+        <member name="M:System.Diagnostics.Internal.ReflectionHelper.GetTransformerNames(System.Attribute)">
+            <summary>
+            Returns 'TransformNames' property value from a given <paramref name="attribute"/>.
+            </summary>
+            <remarks>
+            To avoid compile-time depencency hell with System.ValueTuple, this method uses reflection 
+            instead of casting the attribute to a specific type.
+            </remarks>
+        </member>
+        <member name="M:System.Diagnostics.TypeNameHelper.GetTypeDisplayName(System.Type,System.Boolean,System.Boolean)">
+            <summary>
+            Pretty print a type name.
+            </summary>
+            <param name="type">The <see cref="T:System.Type"/>.</param>
+            <param name="fullName"><c>true</c> to print a fully qualified name.</param>
+            <param name="includeGenericParameterNames"><c>true</c> to include generic parameter names.</param>
+            <returns>The pretty printed type name.</returns>
+        </member>
+        <member name="M:System.Diagnostics.TypeNameHelper.GetTypeNameForGenericType(System.Type)">
+            <summary>
+            Returns a name of given generic type without '`'.
+            </summary>
+        </member>
+        <member name="P:System.Collections.Generic.Enumerable.EnumerableIList`1.Item(System.Int32)">
+            <inheritdoc />
+        </member>
+        <member name="P:System.Collections.Generic.Enumerable.EnumerableIList`1.Count">
+            <inheritdoc />
+        </member>
+        <member name="P:System.Collections.Generic.Enumerable.EnumerableIList`1.IsReadOnly">
+            <inheritdoc />
+        </member>
+        <member name="M:System.Collections.Generic.Enumerable.EnumerableIList`1.Add(`0)">
+            <inheritdoc />
+        </member>
+        <member name="M:System.Collections.Generic.Enumerable.EnumerableIList`1.Clear">
+            <inheritdoc />
+        </member>
+        <member name="M:System.Collections.Generic.Enumerable.EnumerableIList`1.Contains(`0)">
+            <inheritdoc />
+        </member>
+        <member name="M:System.Collections.Generic.Enumerable.EnumerableIList`1.CopyTo(`0[],System.Int32)">
+            <inheritdoc />
+        </member>
+        <member name="M:System.Collections.Generic.Enumerable.EnumerableIList`1.IndexOf(`0)">
+            <inheritdoc />
+        </member>
+        <member name="M:System.Collections.Generic.Enumerable.EnumerableIList`1.Insert(System.Int32,`0)">
+            <inheritdoc />
+        </member>
+        <member name="M:System.Collections.Generic.Enumerable.EnumerableIList`1.Remove(`0)">
+            <inheritdoc />
+        </member>
+        <member name="M:System.Collections.Generic.Enumerable.EnumerableIList`1.RemoveAt(System.Int32)">
+            <inheritdoc />
         </member>
     </members>
 </doc>

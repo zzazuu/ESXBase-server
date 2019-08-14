@@ -1,18 +1,101 @@
-local threads = {}
-local curThread
-local curThreadIndex
+-- temp
+local function FormatStackTrace()
+	return Citizen.InvokeNative(`FORMAT_STACK_TRACE` & 0xFFFFFFFF, nil, 0, Citizen.ResultAsString())
+end
+
+local newThreads = {}
+local threads = setmetatable({}, {
+	-- This circumvents undefined behaviour in "next" (and therefore "pairs")
+	__newindex = newThreads,
+	-- This is needed for CreateThreadNow to work correctly
+	__index = newThreads
+})
+
+local boundaryIdx = 1
+local runningThread
+
+local function dummyUseBoundary(idx)
+	return nil
+end
+
+local function getBoundaryFunc(bfn, bid)
+	return function(fn, ...)
+		local boundary = bid or (boundaryIdx + 1)
+		boundaryIdx = boundaryIdx + 1
+		
+		bfn(boundary, coroutine.running())
+
+		local wrap = function(...)
+			dummyUseBoundary(boundary)
+			
+			local v = table.pack(fn(...))
+			return table.unpack(v)
+		end
+		
+		local v = table.pack(wrap(...))
+		
+		bfn(boundary, nil)
+		
+		return table.unpack(v)
+	end
+end
+
+local runWithBoundaryStart = getBoundaryFunc(Citizen.SubmitBoundaryStart)
+local runWithBoundaryEnd = getBoundaryFunc(Citizen.SubmitBoundaryEnd)
+
+--[[
+
+	Thread handling
+
+]]
+local function resumeThread(coro) -- Internal utility
+	if coroutine.status(coro) == "dead" then
+		threads[coro] = nil
+		return false
+	end
+
+	runningThread = coro
+
+	Citizen.SubmitBoundaryStart(threads[coro].boundary, coro)
+	local ok, wakeTimeOrErr = coroutine.resume(coro)
+	
+	if ok then
+		local thread = threads[coro]
+		if thread then
+			thread.wakeTime = wakeTimeOrErr or 0
+		end
+	else
+		--Citizen.Trace("Error resuming coroutine: " .. debug.traceback(coro, wakeTimeOrErr) .. "\n")
+		local fst = FormatStackTrace()
+		
+		if fst then
+			Citizen.Trace("^1SCRIPT ERROR: " .. wakeTimeOrErr .. "^7\n")
+			Citizen.Trace(fst)
+		end
+	end
+	
+	runningThread = nil
+	
+	-- Return not finished
+	return coroutine.status(coro) ~= "dead"
+end
 
 function Citizen.CreateThread(threadFunction)
-	table.insert(threads, {
-		coroutine = coroutine.create(threadFunction),
-		wakeTime = 0
-	})
+	local bid = boundaryIdx + 1
+	boundaryIdx = boundaryIdx + 1
+
+	local tfn = function()
+		return runWithBoundaryStart(threadFunction, bid)
+	end
+
+	threads[coroutine.create(tfn)] = {
+		wakeTime = 0,
+		boundary = bid
+	}
 end
 
 function Citizen.Wait(msec)
-	curThread.wakeTime = GetGameTimer() + msec
-
-	coroutine.yield()
+	coroutine.yield(GetGameTimer() + msec)
 end
 
 -- legacy alias (and to prevent people from calling the game's function)
@@ -20,123 +103,72 @@ Wait = Citizen.Wait
 CreateThread = Citizen.CreateThread
 
 function Citizen.CreateThreadNow(threadFunction)
-	local coro = coroutine.create(threadFunction)
+	local bid = boundaryIdx + 1
+	boundaryIdx = boundaryIdx + 1
 
-	local t = {
-		coroutine = coro,
-		wakeTime = 0
+	local tfn = function()
+		return runWithBoundaryStart(threadFunction, bid)
+	end
+
+	local coro = coroutine.create(tfn)
+	threads[coro] = {
+		wakeTime = 0,
+		boundary = bid
 	}
-
-	-- add new thread and save old thread
-	local oldThread = curThread
-	curThread = t
-
-	local result, err = coroutine.resume(coro)
-
-	local resumedThread = curThread
-	-- restore last thread
-	curThread = oldThread
-
-	if err then
-		error('Failed to execute thread: ' .. debug.traceback(coro, err))
-	end
-
-	if resumedThread and coroutine.status(coro) ~= 'dead' then
-		table.insert(threads, t)
-	end
-
-	return coroutine.status(coro) ~= 'dead'
+	return resumeThread(coro)
 end
 
-local inNext
-
 function Citizen.Await(promise)
-	if not curThread then
+	local coro = coroutine.running()
+	if not coro then
 		error("Current execution context is not in the scheduler, you should use CreateThread / SetTimeout or Event system (AddEventHandler) to be able to Await")
 	end
 
-	-- Remove current thread from the pool (avoid resume from the loop)
-	if curThreadIndex then
-		table.remove(threads, curThreadIndex)
-	end
-
-	curThreadIndex = nil
-	local resumableThread = curThread
-	
-	inNext = true
-	local nextResult
-	local nextErr
-	local resolved
-	
-	promise:next(function (result)
-		-- was already resolved? then resolve instantly
-		if inNext then
-			nextResult = result
-			resolved = true
-			
-			return
-		end
-	
-		-- Reattach thread
-		table.insert(threads, resumableThread)
-
-		curThread = resumableThread
-		curThreadIndex = #threads
-
-		local result, err = coroutine.resume(resumableThread.coroutine, result)
-
-		if err then
-			error('Failed to resume thread: ' .. debug.traceback(resumableThread.coroutine, err))
-		end
-
-		return result
-	end, function (err)
-		if err then
-			-- if already rejected, handle rejection instantly
-			if inNext then
-				nextErr = err
-				resolved = true
-				
-				return
-			end
-			
-			-- resume with error
-			local result, coroErr = coroutine.resume(resumableThread.coroutine, nil, err)
-			
-			if coroErr then
-				Citizen.Trace('Await failure: ' .. debug.traceback(resumableThread.coroutine, coroErr, 2))
-			end
-		end
+	-- Indicates if the promise has already been resolved or rejected
+	-- This is a hack since the API does not expose its state
+	local isDone = false
+	local result, err
+	promise = promise:next(function(...)
+		isDone = true
+		result = {...}
+	end,function(error)
+		isDone = true
+		err = error
 	end)
-	
-	inNext = false
-	
-	if resolved then
-		if nextErr then
-			error(nextErr)
+
+	if not isDone then
+		local threadData = threads[coro]
+		threads[coro] = nil
+
+		local function reattach()
+			threads[coro] = threadData
+			resumeThread(coro)
 		end
-	
-		return nextResult
+
+		promise:next(reattach, reattach)
+		Citizen.Wait(0)
 	end
-	
-	curThread = nil
-	local result, err = coroutine.yield()
-	
+
 	if err then
 		error(err)
 	end
-	
-	return result
+
+	return table.unpack(result)
 end
 
--- SetTimeout
-local timeouts = {}
-
 function Citizen.SetTimeout(msec, callback)
-	table.insert(threads, {
-		coroutine = coroutine.create(callback),
-		wakeTime = GetGameTimer() + msec
-	})
+	local bid = boundaryIdx + 1
+	boundaryIdx = boundaryIdx + 1
+
+	local tfn = function()
+		return runWithBoundaryStart(callback, bid)
+	end
+
+	local coro = coroutine.create(tfn)
+	threads[coro] = {
+		wakeTime = GetGameTimer() + msec,
+		boundary = bid
+	}
 end
 
 SetTimeout = Citizen.SetTimeout
@@ -144,32 +176,23 @@ SetTimeout = Citizen.SetTimeout
 Citizen.SetTickRoutine(function()
 	local curTime = GetGameTimer()
 
-	for i = #threads, 1, -1 do
-		local thread = threads[i]
-
-		if curTime >= thread.wakeTime then
-			curThread = thread
-			curThreadIndex = i
-
-			local status = coroutine.status(thread.coroutine)
-
-			if status == 'dead' then
-				table.remove(threads, i)
-			else
-				local result, err = coroutine.resume(thread.coroutine)
-
-				if not result then
-					Citizen.Trace("Error resuming coroutine: " .. debug.traceback(thread.coroutine, err) .. "\n")
-
-					table.remove(threads, i)
-				end
-			end
-		end
+	for coro, thread in pairs(newThreads) do
+		rawset(threads, coro, thread)
+		newThreads[coro] = nil
 	end
 
-	curThread = nil
-	curThreadIndex = nil
+	for coro, thread in pairs(threads) do
+		if curTime >= thread.wakeTime then
+			resumeThread(coro)
+		end
+	end
 end)
+
+--[[
+
+	Event handling
+
+]]
 
 local alwaysSafeEvents = {
 	["playerDropped"] = true,
@@ -225,6 +248,77 @@ Citizen.SetEventRoutine(function(eventName, eventPayload, eventSource)
 	_G.source = lastSource
 end)
 
+local stackTraceBoundaryIdx
+
+Citizen.SetStackTraceRoutine(function(bs, ts, be, te)
+	if not ts then
+		ts = runningThread
+	end
+
+	local t
+	local n = 1
+	
+	local frames = {}
+	local skip = false
+	
+	if bs then
+		skip = true
+	end
+	
+	repeat
+		if ts then
+			t = debug.getinfo(ts, n, 'nlfS')
+		else
+			t = debug.getinfo(n, 'nlfS')
+		end
+		
+		if t then
+			if t.name == 'wrap' and t.source == '@citizen:/scripting/lua/scheduler.lua' then
+				if not stackTraceBoundaryIdx then
+					local b, v
+					local u = 1
+					
+					repeat
+						b, v = debug.getupvalue(t.func, u)
+						
+						if b == 'boundary' then
+							break
+						end
+						
+						u = u + 1
+					until not b
+					
+					stackTraceBoundaryIdx = u
+				end
+				
+				local _, boundary = debug.getupvalue(t.func, stackTraceBoundaryIdx)
+				
+				if boundary == bs then
+					skip = false
+				end
+				
+				if boundary == be then
+					break
+				end
+			end
+			
+			if not skip then
+				if t.source and t.source:sub(1, 1) ~= '=' and t.source:sub(1, 10) ~= '@citizen:/' then
+					table.insert(frames, {
+						file = t.source:sub(2),
+						line = t.currentline,
+						name = t.name or '[global chunk]'
+					})
+				end
+			end
+		
+			n = n + 1
+		end
+	until not t
+	
+	return msgpack.pack(frames)
+end)
+
 local eventKey = 10
 
 function AddEventHandler(eventName, eventRoutine)
@@ -275,7 +369,9 @@ end
 function TriggerEvent(eventName, ...)
 	local payload = msgpack.pack({...})
 
-	return TriggerEventInternal(eventName, payload, payload:len())
+	return runWithBoundaryEnd(function()
+		return TriggerEventInternal(eventName, payload, payload:len())
+	end)
 end
 
 if IsDuplicityVersion() then
@@ -371,6 +467,17 @@ function Citizen.GetFunctionReference(func)
 	return nil
 end
 
+local function doStackFormat(err)
+	local fst = FormatStackTrace()
+	
+	-- already recovering from an error
+	if not fst then
+		return nil
+	end
+
+	return '^1SCRIPT ERROR: ' .. err .. "^7\n" .. fst
+end
+
 Citizen.SetCallRefRoutine(function(refId, argsSerialized)
 	local refPtr = funcRefs[refId]
 
@@ -389,10 +496,10 @@ Citizen.SetCallRefRoutine(function(refId, argsSerialized)
 	local waited = Citizen.CreateThreadNow(function()
 		local status, result, error = xpcall(function()
 			retvals = { ref(table.unpack(msgpack.unpack(argsSerialized))) }
-		end, debug.traceback)
+		end, doStackFormat)
 
 		if not status then
-			err = result
+			err = result or ''
 		end
 
 		if cb.cb then
@@ -402,7 +509,12 @@ Citizen.SetCallRefRoutine(function(refId, argsSerialized)
 
 	if not waited then
 		if err then
-			error(err)
+			--error(err)
+			if err ~= '' then
+				Citizen.Trace(err)
+			end
+			
+			return msgpack.pack(nil)
 		end
 
 		return msgpack.pack(retvals)
@@ -504,20 +616,22 @@ if GetCurrentResourceName() == 'sessionmanager' then
 
 		makeArgRefs(args)
 
-		local payload = Citizen.InvokeFunctionReference(refId, msgpack.pack(args))
+		runWithBoundaryEnd(function()
+			local payload = Citizen.InvokeFunctionReference(refId, msgpack.pack(args))
 
-		if #payload == 0 then
-			returnEvent(false, 'err')
-			return
-		end
+			if #payload == 0 then
+				returnEvent(false, 'err')
+				return
+			end
 
-		local rvs = msgpack.unpack(payload)
+			local rvs = msgpack.unpack(payload)
 
-		if type(rvs[1]) == 'table' and rvs[1].__cfx_async_retval then
-			rvs[1].__cfx_async_retval(returnEvent)
-		else
-			returnEvent(rvs)
-		end
+			if type(rvs[1]) == 'table' and rvs[1].__cfx_async_retval then
+				rvs[1].__cfx_async_retval(returnEvent)
+			else
+				returnEvent(rvs)
+			end
+		end)
 	end)
 end
 
@@ -568,7 +682,7 @@ end
 
 -- RPC INVOCATION
 InvokeRpcEvent = function(source, ref, args)
-	if not curThread then
+	if not coroutine.running() then
 		error('RPC delegates can only be invoked from a thread.')
 	end
 
@@ -624,11 +738,13 @@ local funcref_mt = {
 			local args = msgpack.pack({...})
 
 			-- as Lua doesn't allow directly getting lengths from a data buffer, and _s will zero-terminate, we have a wrapper in the game itself
-			local rv = Citizen.InvokeFunctionReference(ref, args)
+			local rv = runWithBoundaryEnd(function()
+				return Citizen.InvokeFunctionReference(ref, args)
+			end)
 			local rvs = msgpack.unpack(rv)
 
 			-- handle async retvals from refs
-			if rvs and type(rvs[1]) == 'table' and rawget(rvs[1], '__cfx_async_retval') and curThread then
+			if rvs and type(rvs[1]) == 'table' and rawget(rvs[1], '__cfx_async_retval') and coroutine.running() then
 				local p = promise.new()
 
 				rvs[1].__cfx_async_retval(function(r, e)
