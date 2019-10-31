@@ -1,3 +1,6 @@
+# THIS SERVER IS NOT BEING UPDATED ANYMORE!
+It will work fine for some time now scriptwise, but you will probably have to take care about updating the server artifacts and Visual C++.
+
 # ESXBase-server
 A server made with base resources from ESX and Essentialmode Framework. And also ESX_kashacters.
 
